@@ -10,6 +10,7 @@ import torch
 import argparse
 import time
 import sys
+from matching import PlanarMatching
 
 def crop_quadrangle(image, vertices, width, height):
     """
@@ -137,6 +138,14 @@ def streight(image_A):
     image_B = image_B.astype(np.uint8)
     return image_B
 
+def streight_sift_matcḥ̣̣(img):
+
+    res, area, H = M.is_image_relevant(img_2=img,output_vis=False)
+    if res:
+        img_streight = cv2.warpPerspective(img, H, (1280, 720))
+        img_streight = img_streight.astype(np.uint8)
+
+    return res , img_streight
 
 
 def crop_items_ocr(image_B):
@@ -197,16 +206,28 @@ def process(frame):
     results: dict = {}
     t1 = time.time()
     #Step 1: streight_image
-    #frame = streight(frame)
 
+    res, frame = streight_sift_matcḥ̣̣(frame)
+    print( "time warp " , time.time() - t1)
+    t1 = time.time()
+
+    if not(res):
+        return results
+
+   
     #Step 2: crop_item ocr
     list_image_crop = crop_items_ocr(frame)
-
+    print( "time crop " , time.time() - t1)
+    t1 = time.time()
     #Step 3.1: rotate list_image_crop
     results_image_rotate = rotate_list_iamges(list_image_crop)
-    print(time.time() - t1)
+    print( "time pre process " , time.time() - t1)
+    t1 = time.time()
+
     #Step 3.2: OCR Reader
     results = OCR_Reader(results_image_rotate)
+    print( "time ocr " , time.time() - t1)
+    t1 = time.time()
 
     return results
 
@@ -220,8 +241,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--input", type=str, 
-        default="./template.jpg",
-        help="Path to input image file"
+
+        default="./data/Sample_Machinery.mp4",
+        help="Path to input video file"
+    )
+    parser.add_argument(
+        "--num_frame", type=int, 
+        default=30,
+        help="After how many frames, it will be processed once"
     )
     parser.add_argument(
         "--maps", type=str,
@@ -233,11 +260,12 @@ if __name__ == "__main__":
     
     # data
     maps = args.maps
-    image_path = args.input
-
+    in_video_path =  args.input
     #Get maps2crop table
     coordinates: list = []
     names: list = []
+    query_img = cv2.imread("./data/template.jpg")
+    M = PlanarMatching(query_img)
     with open(maps, 'r') as file:
         for line in file:
             # Split each line by tab ('\t') and strip any leading/trailing whitespace
@@ -251,10 +279,29 @@ if __name__ == "__main__":
     ocr = PaddleOCR(use_angle_cls=True, lang='en', use_gpu=use_gpu)
     
 
-    frame = cv2.imread(image_path)
-    start = time.time()
-    results_OCR = process(frame=frame)
-    end = time.time()
-    print('Time: ', end - start, '\n', results_OCR)
+
+    cap = cv2.VideoCapture(in_video_path)
+
+    if not cap.isOpened():
+        print("Error: Could not open video file.")
+        exit()
+        
+    frame_number = 0 
+    capture_interval = args.num_frame
+    while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+            frame_number += 1
+            if frame_number % capture_interval == 0:
+                start = time.time()
+                results = process(frame=frame)
+                end = time.time()
+                print('Time: ', end - start, '\n')
+               
+                
+    cap.release()
     
             
