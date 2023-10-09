@@ -9,6 +9,7 @@ import re
 import torch
 import argparse
 import time
+import sys
 
 def crop_quadrangle(image, vertices, width, height):
     """
@@ -16,19 +17,15 @@ def crop_quadrangle(image, vertices, width, height):
     
     Parameters:
     - image: Input image (numpy array).
-    - vertices: List of four vertex coordinates [(x1, y1), (x2, y2), (x3, y3), (x4, y4)] representing the corners of the quadrangle.
+    - vertices: Top-left point of rectangle.
     - width: Width of the output cropped quadrangle.
     - height: Height of the output cropped quadrangle.
 
     Returns:
     - Cropped quadrangle region as a numpy array.
     """
-    dst_vertices = np.array([[0, 0], [width - 1, 0], [width - 1, height - 1], [0, height - 1]], dtype=np.float32)
-    if len(vertices) != 4 or len(dst_vertices) != 4:
-        raise ValueError("Both vertices and dst_vertices must have 4 points each.")
-    vertices = np.array(vertices, dtype=np.float32)
-    matrix = cv2.getPerspectiveTransform(vertices, dst_vertices)
-    cropped_quadrangle = cv2.warpPerspective(image, matrix, (width, height))
+    (x, y) = vertices
+    cropped_quadrangle = image[y:y+height, x:x+width]
     return cropped_quadrangle
 
 def crop(img):
@@ -149,8 +146,8 @@ def crop_items_ocr(image_B):
     """
     list_images_crop: list =[]
     for i in range(len(names)):
-        (w, h) = coordinates[i][6]
-        cropped_image = crop_quadrangle(image_B, coordinates[i][:4], w, h)
+        (w, h) = coordinates[i][1]
+        cropped_image = crop_quadrangle(image_B, coordinates[i][0], w, h)
         if i+1 == 1 or i+1 == 4:
             cropped_image = crop(cv2.cvtColor(cropped_image, cv2.COLOR_BGR2GRAY))
             cropped_image = cv2.cvtColor(cropped_image, cv2.COLOR_GRAY2BGR)
@@ -167,19 +164,19 @@ def OCR_Reader(images_rotate):
     results: dict = {}
     num_image_crop = len(images_rotate)
     for i in range(num_image_crop):
-        result = ocr.ocr(img=images_rotate[i], cls=False)
-        result = result[0]
+        #cv2.imwrite(f'./sample/{i}.png', images_rotate[i])
         
+        result = ocr.ocr(img=images_rotate[i], cls=False)
+       
+        result = result[0]
         try:
             #boxes = [line[0] for line in result]
             txts = [(((line[1][0].replace('O', '0')).replace(' ', '')).replace(' ', '')) for line in result]
             #scores = [line[1][1] for line in result]
             for k in range(len(txts)):
                 txts[k] = ''.join(filter(lambda char: char.isdigit() or char == '.', txts[k])) 
+            
             results[names[i]] = txts
-            if names[i] == '8':
-                results[names[i]] = txts[-2]
-                results['9'] = txts[-1]
         except:
             results[names[i]] = ' '
     return results
@@ -200,7 +197,7 @@ def process(frame):
     results: dict = {}
     t1 = time.time()
     #Step 1: streight_image
-    frame = streight(frame)
+    #frame = streight(frame)
 
     #Step 2: crop_item ocr
     list_image_crop = crop_items_ocr(frame)
@@ -213,6 +210,7 @@ def process(frame):
 
     return results
 
+
 if __name__ == "__main__":
     device = torch.device(f"cuda:0" if torch.cuda.is_available() and not False else "cpu")
     use_gpu = False
@@ -222,13 +220,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--input", type=str, 
-        default="./data/Sample_Machinery.mp4",
-        help="Path to input video file"
-    )
-    parser.add_argument(
-        "--num_frame", type=int, 
-        default=15,
-        help="After how many frames, it will be processed once"
+        default="./template.jpg",
+        help="Path to input image file"
     )
     parser.add_argument(
         "--maps", type=str,
@@ -240,7 +233,7 @@ if __name__ == "__main__":
     
     # data
     maps = args.maps
-    in_video_path = args.input
+    image_path = args.input
 
     #Get maps2crop table
     coordinates: list = []
@@ -250,32 +243,18 @@ if __name__ == "__main__":
             # Split each line by tab ('\t') and strip any leading/trailing whitespace
             values = line.strip().split('\t')
             line_tuple = [
-                (int(values[i]), int(values[i+1])) for i in range(1, 14, 2) 
+                (int(values[i]), int(values[i+1])) for i in range(1, 4, 2) 
             ]
             names.append(values[0])
             coordinates.append(line_tuple)
-
+    
     ocr = PaddleOCR(use_angle_cls=True, lang='en', use_gpu=use_gpu)
+    
 
-    cap = cv2.VideoCapture(in_video_path)
-
-    if not cap.isOpened():
-        print("Error: Could not open video file.")
-        exit()
-        
-    frame_number = 0 
-    capture_interval = args.num_frame
-    while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-            if frame_number % capture_interval == 0:
-                start = time.time()
-                results_OCR = process(frame=frame)
-                end = time.time()
-                print('Time: ', end - start, '\n', results_OCR)
-    cap.release()
+    frame = cv2.imread(image_path)
+    start = time.time()
+    results_OCR = process(frame=frame)
+    end = time.time()
+    print('Time: ', end - start, '\n', results_OCR)
     
             
