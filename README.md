@@ -4,9 +4,8 @@ OCR LCD device
 ## Input
 The input consists of 3 arguments
 
-|arg|help|
+
 |`--input`|Path to input video file|
-|---------|------------------------|
 |`--output`|Path to output video file|
 |`--maps`|Path to map_detect file|
 
