@@ -7,7 +7,7 @@ The input consists of 3 arguments
 |arg|help|
 |---------|------------------------|
 |`--input`|Path to input video file|
-|`--output`|Path to output video file|
+|`--num_frame`|After how many frames, it will be processed once|
 |`--maps`|Path to map_detect file|
 
 ## Installation
@@ -17,11 +17,9 @@ pip3 install -r requirements.txt
 ## Run
 cd into each PMS or Machinery folder and run
 ```
-python3 main.py --input <path2input video> --output <path2output video> --maps <path2maps detect table>
+python3 main.py --input <path2input video> --num_frame <int_value> --maps <path2maps detect table>
 ```
 
 ## Output
-Output returns the video with the PutText read by PaddleOCR
-
-Output video: `./data/output_video.avi`
+Dict contains OCR results according to the index typed in the target file: `./data/target.png`
 
