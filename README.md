@@ -22,5 +22,6 @@ python3 main.py --input <path2input video> --output <path2output video> --maps <
 
 ## Output
 Output returns the video with the PutText read by PaddleOCR
+
 Output video: `./data/output_video.avi`
 
