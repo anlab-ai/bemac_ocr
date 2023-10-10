@@ -229,7 +229,23 @@ def process(frame):
     print( "time ocr " , time.time() - t1)
     t1 = time.time()
 
-    return results
+    return results, frame
+
+def drawText(image, results):
+    white = (255, 255, 255)
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = .53
+    font_color = (0, 255, 0)
+    thickness = 2
+
+    for i in range(len(coordinates)):
+        x, y = coordinates[i][0]
+        w, h = coordinates[i][1]
+
+        #image = cv2.rectangle(image, (x, y), (x+w, y+h), white, thickness=cv2.FILLED)
+        image = cv2.putText(image, results[names[i]][-1], (x-5, y+h-5), font, font_scale, font_color, thickness, cv2.LINE_AA)
+    return image
+
 
 
 if __name__ == "__main__":
@@ -297,7 +313,10 @@ if __name__ == "__main__":
             frame_number += 1
             if frame_number % capture_interval == 0:
                 start = time.time()
-                results = process(frame=frame)
+                results, frame = process(frame=frame)
+                # Draw text2frame
+                frame = drawText(frame, results)
+                cv2.imwrite('drawText.png', frame)
                 end = time.time()
                 print('Time: ', end - start, '\n')
                
