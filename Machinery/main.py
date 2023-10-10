@@ -171,6 +171,8 @@ def OCR_Reader(images_rotate):
     on a list of rotated images and extracts text information from them.
     """
     results: dict = {}
+    results_scores: dict = {}
+
     num_image_crop = len(images_rotate)
     for i in range(num_image_crop):
         #cv2.imwrite(f'./sample/{i}.png', images_rotate[i])
@@ -180,15 +182,17 @@ def OCR_Reader(images_rotate):
         result = result[0]
         try:
             #boxes = [line[0] for line in result]
+            scores = [line[1][1] for line in result]
+            results_scores[names[i]] = scores
             txts = [(((line[1][0].replace('O', '0')).replace(' ', '')).replace(' ', '')) for line in result]
-            #scores = [line[1][1] for line in result]
+            
             for k in range(len(txts)):
                 txts[k] = ''.join(filter(lambda char: char.isdigit() or char == '.', txts[k])) 
             
             results[names[i]] = txts
         except:
             results[names[i]] = ' '
-    return results
+    return results, results_scores
 
 def process(frame):
     """
@@ -204,6 +208,8 @@ def process(frame):
     The results are returned as a dictionary, where each item corresponds to a named region of interest.
     """
     results: dict = {}
+    results_scores: dict = {}
+
     t1 = time.time()
     #Step 1: streight_image
 
@@ -225,11 +231,11 @@ def process(frame):
     t1 = time.time()
 
     #Step 3.2: OCR Reader
-    results = OCR_Reader(results_image_rotate)
+    results, results_scores = OCR_Reader(results_image_rotate)
     print( "time ocr " , time.time() - t1)
     t1 = time.time()
 
-    return results, frame
+    return results, results_scores, frame
 
 def drawText(image, results):
     white = (255, 255, 255)
@@ -313,10 +319,13 @@ if __name__ == "__main__":
             frame_number += 1
             if frame_number % capture_interval == 0:
                 start = time.time()
-                results, frame = process(frame=frame)
+                
+                results, scores, frame = process(frame=frame)
+
                 # Draw text2frame
                 frame = drawText(frame, results)
                 cv2.imwrite('drawText.png', frame)
+                
                 end = time.time()
                 print('Time: ', end - start, '\n')
                
