@@ -9,6 +9,7 @@ import re
 import torch
 import argparse
 import time
+from matching import PlanarMatching
 
 def crop_quadrangle(image, vertices, width, height):
     """
@@ -23,12 +24,8 @@ def crop_quadrangle(image, vertices, width, height):
     Returns:
     - Cropped quadrangle region as a numpy array.
     """
-    dst_vertices = np.array([[0, 0], [width - 1, 0], [width - 1, height - 1], [0, height - 1]], dtype=np.float32)
-    if len(vertices) != 4 or len(dst_vertices) != 4:
-        raise ValueError("Both vertices and dst_vertices must have 4 points each.")
-    vertices = np.array(vertices, dtype=np.float32)
-    matrix = cv2.getPerspectiveTransform(vertices, dst_vertices)
-    cropped_quadrangle = cv2.warpPerspective(image, matrix, (width, height))
+    (x, y) = vertices
+    cropped_quadrangle = image[y:y+height, x:x+width]
     return cropped_quadrangle
 
 def correct_skew(image, delta=0.2, limit=5, type=1):
@@ -96,7 +93,14 @@ def streight(image_A):
     image_B = image_B.astype(np.uint8)
     return image_B
 
+def streight_sift_matcḥ̣̣(img):
 
+    res, area, H = M.is_image_relevant(img_2=img,output_vis=False)
+    if res:
+        img_streight = cv2.warpPerspective(img, H, (1280, 960))
+        img_streight = img_streight.astype(np.uint8)
+
+    return res , img_streight
 
 def crop_items_ocr(image_B):
     """
@@ -105,8 +109,8 @@ def crop_items_ocr(image_B):
     """
     list_images_crop: list =[]
     for i in range(len(names)):
-        (w, h) = coordinates[i][6]
-        cropped_image = crop_quadrangle(image_B, coordinates[i][:4], w, h)
+        (w, h) = coordinates[i][1]
+        cropped_image = crop_quadrangle(image_B, coordinates[i][0], w, h)
         list_images_crop.append(cropped_image)
     
     return list_images_crop
@@ -118,22 +122,27 @@ def OCR_Reader(images_rotate):
     on a list of rotated images and extracts text information from them.
     """
     results: dict = {}
+    results_scores: dict = {}
+
     num_image_crop = len(images_rotate)
     for i in range(num_image_crop):
+        #cv2.imwrite(f'./sample/{i}.png', images_rotate[i])
         result = ocr.ocr(img=images_rotate[i], cls=True)
         result = result[0]
-        
         try:
             #boxes = [line[0] for line in result]
+            scores = [line[1][1] for line in result]
+            results_scores[names[i]] = scores
             txts = [(((line[1][0].replace('O', '0')).replace(' ', '')).replace(' ', '')).replace('-','') for line in result]
-            #scores = [line[1][1] for line in result]
+            
             for k in range(len(txts)):
                 txts[k] = ''.join(filter(lambda char: char.isdigit() or char == '.' or char == '-', txts[k])) 
             
             results[names[i]] = txts
+            
         except:
             results[names[i]] = ' '
-    return results
+    return results, results_scores
 
 def process(frame):
     """
@@ -149,20 +158,52 @@ def process(frame):
     The results are returned as a dictionary, where each item corresponds to a named region of interest.
     """
     results: dict = {}
+    results_scores: dict = {}
     t1 = time.time()
+
     #Step 1: streight_image
-    frame = streight(frame)
+    #frame = streight(frame)
+    res, frame = streight_sift_matcḥ̣̣(frame)
+    print( "time warp " , time.time() - t1)
+    t1 = time.time()
+
+    if not(res):
+        return results
 
     #Step 2: crop_item ocr
     list_image_crop = crop_items_ocr(frame)
-
+    print( "time crop " , time.time() - t1)
+    t1 = time.time()
     #Step 3.1: rotate list_image_crop
     results_image_rotate = rotate_list_iamges(list_image_crop)
-    print(time.time() - t1)
+    print( "time pre process " , time.time() - t1)
+    t1 = time.time()
     #Step 3.2: OCR Reader
-    results = OCR_Reader(results_image_rotate)
+    results, results_scores = OCR_Reader(results_image_rotate)
+    print( "time ocr " , time.time() - t1)
 
-    return results
+
+    return results, results_scores, frame
+
+
+def drawText(image, results):
+    white = (255, 255, 255)
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = .53
+    font_color = (0, 255, 0)
+    thickness = 2
+
+    for i in range(len(coordinates)):
+        x, y = coordinates[i][0]
+        w, h = coordinates[i][1]
+        
+        if len(results[names[i]]) > 0:
+            for k in range(len(results[names[i]])):
+                #image = cv2.rectangle(image, (x, y), (x+w, y+h), white, thickness=cv2.FILLED)
+                image = cv2.putText(image, results[names[i]][k], (x+w-10, y + 12), font, font_scale, font_color, thickness, cv2.LINE_AA)
+                y += 20
+    return image
+
 
 if __name__ == "__main__":
     device = torch.device(f"cuda:0" if torch.cuda.is_available() and not False else "cpu")
@@ -196,12 +237,14 @@ if __name__ == "__main__":
     #Get maps2crop table
     coordinates: list = []
     names: list = []
+    query_img = cv2.imread("./data/template_PMS.jpg")
+    M = PlanarMatching(query_img)
     with open(maps, 'r') as file:
         for line in file:
             # Split each line by tab ('\t') and strip any leading/trailing whitespace
             values = line.strip().split('\t')
             line_tuple = [
-                (int(values[i]), int(values[i+1])) for i in range(1, 14, 2) 
+                (int(values[i]), int(values[i+1])) for i in range(1, 4, 2) 
             ]
             names.append(values[0])
             coordinates.append(line_tuple)
@@ -224,9 +267,15 @@ if __name__ == "__main__":
                 break
             if frame_number % capture_interval == 0:
                 start = time.time()
-                results_OCR = process(frame=frame)
+                
+                results, scores, frame = process(frame=frame)
+                
+                # Draw text2frame
+                frame = drawText(frame, results)
+
+                cv2.imwrite('drawText.png', frame)
+                
                 end = time.time()
-                print('Time: ', end - start, '\n', results_OCR)
+                print('Time: ', end - start)
     cap.release()
     
-            
