@@ -223,14 +223,14 @@ class PlanarMatching:
 
     @staticmethod
     def resize_prop_rect(src):
-        MAX_SIZE = ( 720, 1280)
+        # MAX_SIZE = ( 720, 1280)
 
-        xscale = MAX_SIZE[0] / src.shape[0]
-        yscale = MAX_SIZE[1] / src.shape[1]
-        scale = min(xscale, yscale)
-        if scale > 1:
-            return src
-        dst = cv2.resize(src, None, None, scale, scale, cv2.INTER_LINEAR)
+        # xscale = MAX_SIZE[0] / src.shape[0]
+        # yscale = MAX_SIZE[1] / src.shape[1]
+        # scale = min(xscale, yscale)
+        # if scale > 1:
+        #     return src
+        # dst = cv2.resize(src, None, None, scale, scale, cv2.INTER_LINEAR)
         return src
         # return dst
 

@@ -31,6 +31,8 @@ class BemacOCR():
 		self.paddle_ocr = PaddleOCR(use_angle_cls=True, lang='en', use_gpu=use_gpu)
 		print("device:  ",name_device[type_divice])
 		self.config_position , self.query_img = self.load_config̣(name_device[type_divice])
+		self.size_template_width  = self.query_img.shape[1]
+		self.size_template_hieght  = self.query_img.shape[0]
 		self.M = PlanarMatching(self.query_img)
 
 	def load_config̣(self, name_device):
@@ -145,7 +147,7 @@ class BemacOCR():
 
 		res, area, H = self.M.is_image_relevant(img_2=img,output_vis=False)
 		if res:
-			img_streight = cv2.warpPerspective(img, H, (1280, 720))
+			img_streight = cv2.warpPerspective(img, H, (self.size_template_width, self.size_template_hieght))
 			img_streight = img_streight.astype(np.uint8)
 
 		return res , img_streight
