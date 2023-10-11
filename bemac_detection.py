@@ -42,17 +42,22 @@ class BemacOCR():
 
 
 
-	def crop(self, img):
+	def crop(self, img, kk):
 		"""
 		img: gray img
 		"""
+		
 		_,bi_img = cv2.threshold(img,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
 		# bi_img = cv2.dilate(bi_img, (7,7))
 		contours,_ = cv2.findContours(bi_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 		contour_bbox = []
 		imgh, imgw  = bi_img.shape
 		for contour in contours:
-			if cv2.contourArea(contour)< 27:
+			
+			if kk != 9 and cv2.contourArea(contour)< 27:
+	
+				continue
+			if kk == 9 and cv2.contourArea(contour)< 60:
 				continue
 			rect = cv2.boundingRect(contour)
 			x,y,w,h = rect
@@ -83,9 +88,8 @@ class BemacOCR():
 		crop_img = cv2.resize(crop_img, (48, 48),
 				interpolation = cv2.INTER_CUBIC)
 		background_value = int(crop_img[0,0]/2)
-		new_img = cv2.copyMakeBorder(crop_img, 72, 72, 0, 0, cv2.BORDER_CONSTANT,value=background_value)
-
-		return new_img
+		#new_img = cv2.copyMakeBorder(crop_img, 72, 72, 0, 0, cv2.BORDER_CONSTANT,value=background_value)
+		return crop_img# new_img
 
 
 	def correct_skew(self, image, delta=0.2, limit=5, type=1):
@@ -160,29 +164,32 @@ class BemacOCR():
 			width = val["pose"][2]
 			height = val["pose"][3]
 			cropped_image = image_B[y:y+height, x:x+width]
-			if self.type_divice == 0 and  (int(i) == 1 or int(i) == 4 ):
-				cropped_image = self.crop(cv2.cvtColor(cropped_image, cv2.COLOR_BGR2GRAY))
+			if self.type_divice == 0 and  (int(i) == 1 or int(i) == 4 or int(i) == 9):
+				cropped_image = self.crop(cv2.cvtColor(cropped_image, cv2.COLOR_BGR2GRAY), i)
 				cropped_image = cv2.cvtColor(cropped_image, cv2.COLOR_GRAY2BGR)
 			list_images_crop[i] = cropped_image
 		
 		return list_images_crop
 
 
-	def OCR_Reader(self,images_rotate):
+	def OCR_Reader(self,images_rotate, frame_number):
 		"""
 		This function performs OCR (optical character recognition) 
 		on a list of rotated images and extracts text information from them.
 		"""
 		results: dict = {}
-		results_scores: dict = {}
-
+		
 		num_image_crop = len(images_rotate)
 		for i in images_rotate.keys():
-			#cv2.imwrite(f'./sample/{i}.png', images_rotate[i])
 			image = images_rotate[i]
-			result = self.paddle_ocr.ocr(img=image, cls=False)
-		
+			if self.type_divice == 0 and  (int(i) == 1 or int(i) == 4 or int(i) == 9):
+				result = self.paddle_ocr.ocr(img=image, cls=True, inv=True, bin= False, det=False, rec=False)
+			else:
+				result = self.paddle_ocr.ocr(img=image, cls=False)
+
+			
 			result = result[0]
+			
 			# print("result" , result)
 			# cv2.imwrite("aaa.jpg" , image)
 			# print("result" , result)
@@ -192,9 +199,9 @@ class BemacOCR():
 			val = {}
 			try:
 				#boxes = [line[0] for line in result]
-				scores = [line[1][1] for line in result]
-				txts = [(((line[1][0].replace('O', '0')).replace(' ', '')).replace(' ', '')) for line in result]
-				
+				scores = [line[-1][1] for line in result]
+				txts = [(((line[-1][0].replace('O', '0')).replace(' ', '')).replace(' ', '')) for line in result]
+				print(txts)
 				for k in range(len(txts)):
 					txts[k] = ''.join(filter(lambda char: char.isdigit() or char == '.', txts[k]))
 
@@ -208,11 +215,13 @@ class BemacOCR():
 					val["val"] = info
 					val["score"] = scores[0]
 				else:
+					#cv2.imwrite(f'./error/{frame_number}_{i}.png', images_rotate[i])
 					val["val"] = "Nan"
 					val["score"] = ""
 				
 			
 			except:
+				#cv2.imwrite(f'./error/{frame_number}_{i}.png', images_rotate[i])
 				val["val"] = "Nan"
 				val["score"] = ""
 			
@@ -220,7 +229,7 @@ class BemacOCR():
 		return results
 
 
-	def process(self, frame):
+	def process(self, frame, frame_number):
 		"""
 		This is the main processing function that ties everything together. 
 		It takes a frame (image) as input, performs the following steps:
@@ -257,7 +266,7 @@ class BemacOCR():
 		t1 = time.time()
 
 		#Step 3.2: OCR Reader
-		results = self.OCR_Reader(results_image_rotate)
+		results = self.OCR_Reader(results_image_rotate, frame_number)
 		print( "time ocr " , time.time() - t1)
 		t1 = time.time()
 
@@ -286,7 +295,7 @@ class BemacOCR():
 				if frame_number % fps == 0:
 					start = time.time()
 
-					results, frame = self.process(frame=frame)
+					results, frame = self.process(frame=frame, frame_number= frame_number)
 					# cv2.imwrite("frame.jpg", frame)
 					# print("results ", results)
 					# exit()

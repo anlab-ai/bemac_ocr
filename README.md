@@ -14,7 +14,6 @@ The input consists of 3 arguments
 pip3 install -r requirements.txt
 ```
 ## Run
-cd into each PMS or Machinery folder and run
 ```
 python3 bemac_detection.py --input <video folder input> --ouput <save ouput folder> --type <type devic, 0: machinery, 1:pms>
 ```
