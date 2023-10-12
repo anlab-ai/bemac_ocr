@@ -1,4 +1,4 @@
 numpy
 opencv-python 
-paddlepaddle
-paddleocr
+paddlepaddle==2.5.1
+paddleocr==2.7.0.3

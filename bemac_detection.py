@@ -184,6 +184,9 @@ class BemacOCR():
 			image = images_rotate[i]
 			if self.type_divice == 0 and  (int(i) == 1 or int(i) == 4 or int(i) == 9):
 				result = self.paddle_ocr.ocr(img=image, cls=True, inv=True, bin= False, det=False, rec=False)
+			elif self.type_divice == 1 and  (int(i) in [1, 2, 6, 8, 9]):
+				result = self.paddle_ocr.ocr(img=image, cls=True, inv=True, bin= False, det=False, rec=False)
+			
 			else:
 				result = self.paddle_ocr.ocr(img=image, cls=False)
 
