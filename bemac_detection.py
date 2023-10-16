@@ -14,7 +14,7 @@ from pathlib import Path
 
 from matching import PlanarMatching
 import helpers
-
+import cppo_helpers
 
 device = torch.device(f"cuda:0" if torch.cuda.is_available() and not False else "cpu")
 
@@ -22,7 +22,7 @@ device = torch.device(f"cuda:0" if torch.cuda.is_available() and not False else 
 class BemacOCR():
 	def __init__(self, type_divice=0):
 		self.type_divice = type_divice
-		name_device = ["machinery", "pms"]
+		name_device = ["machinery", "pms", "helicon", "cpporder"]
 		
 		
 		use_gpu = False
@@ -184,10 +184,19 @@ class BemacOCR():
 		num_image_crop = len(images_rotate)
 		for i in images_rotate.keys():
 			image = images_rotate[i]
+			val = {}
+			if image is None:
+				val["val"] = "Nan"
+				val["score"] = ""
+				results[i] = val
+				continue
+
 			if self.type_divice == 0 and  (int(i) == 1 or int(i) == 4 or int(i) == 9):
 				result = self.paddle_ocr.ocr(img=image, cls=True, inv=True, bin= False, det=False, rec=False)
 			elif self.type_divice == 1 and  (int(i) in [1,2,6,8,9]):
 				result = self.paddle_ocr.ocr(img=image, cls=True, inv=True, bin= False, det=False, rec=False)
+			elif self.type_divice == 3 :
+				result = self.paddle_ocr.ocr(img=image, cls=True, inv=False, bin= False, det=False, rec=False)
 			else:
 				result = self.paddle_ocr.ocr(img=image, cls=False)
 
@@ -200,7 +209,7 @@ class BemacOCR():
 			# if result is None :
 			#     continue
 			# exit()
-			val = {}
+			
 			try:
 				#boxes = [line[0] for line in result]
 				scores = [line[-1][1] for line in result]
@@ -249,30 +258,42 @@ class BemacOCR():
 		results: dict = {}
 		results_scores: dict = {}
 
-		t1 = time.time()
-		#Step 1: streight_image
+		if (self.type_divice < 3):
+			t1 = time.time()
+			#Step 1: streight_image
 
-		res, frame = self.streight_sift_matcḥ̣̣(frame)
-		print( "time warp " , time.time() - t1)
-		t1 = time.time()
+			res, frame = self.streight_sift_matcḥ̣̣(frame)
+			print( "time warp " , time.time() - t1)
+			t1 = time.time()
 
-		if not(res):
-			return results
+			if not(res):
+				return results
 
-	
-		#Step 2: crop_item ocr
-		list_image_crop = self.crop_items_ocr(frame)
-		print( "time crop " , time.time() - t1)
-		t1 = time.time()
-		#Step 3.1: rotate list_image_crop
-		results_image_rotate = self.rotate_list_iamges(list_image_crop)
-		print( "time pre process " , time.time() - t1)
+		
+			#Step 2: crop_item ocr
+			list_image_crop = self.crop_items_ocr(frame)
+			print( "time crop " , time.time() - t1)
+			t1 = time.time()
+			#Step 3.1: rotate list_image_crop
+			results_image_rotate = self.rotate_list_iamges(list_image_crop)
+			print( "time pre process " , time.time() - t1)
+		else:
+			# segment image.
+			res, img_device = cppo_helpers.segment_device(frame)
+			if not(res):
+				return results
+
+			#Step 2, 3.1: crop_item ocr .
+			results_image_rotate = cppo_helpers.crop_items(img_device, self.config_position)
 		t1 = time.time()
 
 		#Step 3.2: OCR Reader
 		results = self.OCR_Reader(results_image_rotate, frame_number)
 		print( "time ocr " , time.time() - t1)
 		t1 = time.time()
+
+		if self.type_divice == 3:
+			results = cppo_helpers.correct_results(results)
 
 		return results, frame
 
