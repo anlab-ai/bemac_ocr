@@ -15,7 +15,7 @@ pip3 install -r requirements.txt
 ```
 ## Run
 ```
-python3 bemac_detection.py --input <video folder input> --ouput <save ouput folder> --type <type devic, 0: machinery, 1:pms>
+python3 bemac_detection.py --input <video folder input> --ouput <save ouput folder> --type <type devic, 0: machinery, 1:pms, 2:helicon, 3:CPPOder>
 ```
 
 ## Output
