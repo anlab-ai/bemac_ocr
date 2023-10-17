@@ -137,10 +137,14 @@ class BemacOCR():
 		results_rotate = {}
 		for i in list_images.keys():
 			image = list_images[i]
-			cropped_quadrangle = cv2.cvtColor(image ,cv2.COLOR_RGB2GRAY)
-			best_angle = self.correct_skew(cropped_quadrangle, type=1)
-			cropped_quadrangle = self.rotate_an_image(cropped_quadrangle, best_angle)
+			if self.type_divice in [0, 1, 3]:
+				cropped_quadrangle = cv2.cvtColor(image ,cv2.COLOR_RGB2GRAY)
+				best_angle = self.correct_skew(cropped_quadrangle, type=1)
+				cropped_quadrangle = self.rotate_an_image(cropped_quadrangle, best_angle)
+			elif self.type_divice in [2]:
+				cropped_quadrangle = image
 			results_rotate [i] = cropped_quadrangle
+
 		return results_rotate
 
 	def streight_sift_matcḥ̣̣(self, img):
@@ -152,7 +156,38 @@ class BemacOCR():
 
 		return res , img_streight
 
+	def Helicon_filter_item(self, image, num):
+		h, w, _ = image.shape
+		if num in [8]:
+			top_half_image = image[:h//2, :, :]
+			b, g, r = cv2.split(top_half_image)
+			b_thresh = int(np.mean(b) + np.std(b))
+			g_thresh = int(np.mean(g))
+			r_thresh = int(np.mean(r))
 
+			lower = np.array([b_thresh,g_thresh,r_thresh])
+			upper = np.array([255,255,255])
+			image = cv2.inRange(image, lower, upper)
+		elif num in [1, 11]:
+			image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)	
+		elif num in [2]:
+			image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)	
+			image[18:25, 11:26] = image[0, 0]
+			mask = cv2.inRange(image, (1), (1))
+			mask[18:23, 11:26] = 255
+			image = cv2.inpaint(image, mask, inpaintRadius=3, flags=cv2.INPAINT_NS)
+		return image
+
+	def Helicon_OCR_item(self, image, num):
+		if num in [1,2,8,11]:
+			image = self.Helicon_filter_item(image=image, num=num)
+			result = self.paddle_ocr.ocr(img=image, cls=True, inv=False, bin= False, det=False, rec=False)
+		elif num in [3,4]:
+			result = self.paddle_ocr.ocr(img=image, cls=True, inv=True, bin= True, det=False, rec=False)
+		else:
+			result = self.paddle_ocr.ocr(img=image, cls=True, inv=True, bin= False, det=False, rec=False)
+		return result
+	
 	def crop_items_ocr(self, image_B):
 		"""
 		This function crops items of interest (regions of text) 
@@ -195,6 +230,8 @@ class BemacOCR():
 				result = self.paddle_ocr.ocr(img=image, cls=True, inv=True, bin= False, det=False, rec=False)
 			elif self.type_divice == 1 and  (int(i) in [1,2,6,8,9]):
 				result = self.paddle_ocr.ocr(img=image, cls=True, inv=True, bin= False, det=False, rec=False)
+			elif self.type_divice == 2:
+				result = self.Helicon_OCR_item(image=image, num=i)
 			elif self.type_divice == 3 :
 				result = self.paddle_ocr.ocr(img=image, cls=True, inv=False, bin= False, det=False, rec=False)
 			else:
@@ -216,7 +253,7 @@ class BemacOCR():
 				txts = [(((line[-1][0].replace('O', '0')).replace(' ', '')).replace(' ', '')) for line in result]
 				print(txts)
 				for k in range(len(txts)):
-					txts[k] = ''.join(filter(lambda char: char.isdigit() or char == '.', txts[k]))
+					txts[k] = ''.join(filter(lambda char: char.isdigit() or char == '.'  or char == '-' , txts[k]))
 
 				if self.type_divice == 1:
 					txts = [line.replace('-','') for line in  txts]
