@@ -13,7 +13,10 @@ def crop_image(img):
 	cropped_images = []
 	rectangles = []
 	hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-	lower_green = np.array([30,25,25])
+	m, stds  = cv2.meanStdDev(hsv)
+	# print("mean " , m, stds)
+	min_val = max(int(0.85*m[2]) , 25)
+	lower_green = np.array([30,25,min_val])
 	upper_green = np.array([100,255,255])
 	binary_image = cv2.inRange(hsv, lower_green, upper_green)
 	# cv2.imshow("binary " , binary_image)
@@ -42,7 +45,8 @@ def group_and_merge_rectangles(rectangles, img):
 
 	for i in range(1, len(rectangles)):
 		x1, y1, w1, h1 = rectangles[i]
-		x2, _, w2, _ = current_cluster[-1]
+		x2, _, w2, h2 = current_cluster[-1]
+		distance_threshold = 0.95*max(h1,h2)
 
 		distance = x1 - (x2 + w2)
 
@@ -67,10 +71,10 @@ def group_and_merge_rectangles(rectangles, img):
 
 
 def warp_image(image):
-	w = 200
-	h = 60
-	x = 50
-	y = 3
+	w = 220
+	h = 80
+	x = 40
+	y = 5
 
 	pts1 = np.float32([[65, 1], [257, 25],
 					[224, 80], [48, 57]])
@@ -127,7 +131,7 @@ def segment_device(image, input_size = 90):
 		image_device = cv2.resize(image_device, target_size, interpolation=cv2.INTER_CUBIC)
 		# image = cv2.rectangle(image, (x_min, y_min ),(x_max , y_max) , (0, 0 , 255), 2)
 		image_device = warp_image (image_device)
-			
+	# cv2.imshow("image_device " , image_device)		
 	return res_detect, image_device
 
 		  
@@ -151,14 +155,24 @@ def crop_items( image, config_position):
 			else:
 				list_key_pose[1] = i
 		new_image, rectangles = crop_image(img=image)  
-		
+		pix_pad = 3
 		if len(rectangles) > 0 :
 			for i in range(len(rectangles)):
-				x_min = int(max(0,  rectangles[i][0]-3))
-				y_min = int(max(0, rectangles[i][1]-3))
-				x_max = int(min(w, rectangles[i][2]+3))
-				y_max = int(min(h, rectangles[i][3]+3))
+				x_min = int(max(0,  rectangles[i][0]-pix_pad))
+				y_min = int(max(0, rectangles[i][1]-pix_pad))
+				x_max = int(min(w, rectangles[i][2]+pix_pad))
+				y_max = int(min(h, rectangles[i][3]+pix_pad))
+
+				size_x = x_max - x_min
+				size_y = y_max - y_min
+				pix_pad_2 = 0
+				if size_x < 0.6 * size_y:
+					pix_pad_2 = int ((size_y - size_x)/2)
+					x_min = int(max(0,  rectangles[i][0]-pix_pad_2))
+					x_max = int(min(w, rectangles[i][2]+pix_pad_2))
+
 				im = image[y_min:y_max, x_min:x_max]
+				# cv2.imshow(f"im {i} " , im)
 				if x_min > w/2 :
 					list_images_crop[list_key_pose[1]] = im
 				else:
@@ -166,16 +180,44 @@ def crop_items( image, config_position):
 
 		return list_images_crop
 
+def replace_char2digit(input):
+	list_char = ["s","S", "z", "Z" , "p" , "P", "l", ":", "i", "I", "n", "o", "O", "D", "Q", "R", "B"]
+	list_digit = ["5", "5" , "2", "2", "2" , "2", "1", "1" , "1","1", "0" , "0" , "0", "0" , "8", "8"]
+	result = input
+	for c , d in zip(list_char,list_digit):
+		result = result.replace(c, d)
+	return result
+
 def correct_results(results):
 	for  key in results.keys():
 		val = results[key]
 		f = val["val"]
 		score = val["score"]
+		str_trim = f.strip()
+		pose = -1
+		pose2 = -1
+		if "." in str_trim:
+			pose = str_trim.index(".")
+		if "," in str_trim:
+			pose2 = str_trim.index(",")
+
+		is_minus = False
+		if pose ==0:
+			f = f.replace(".", "")
+			is_minus = True
+			
+		if pose2 == 0 :
+			f = f.replace(",", "")
+			is_minus = True
+		val["val"] = f
 		if not(f.isdigit()) :
 			if f in ["a", "n"]:
 				val["val"] = 0
 			else:
 				val["val"] = "Nan"
 				val["score"] = ""
+		elif is_minus:
+			val["val"] = f'-{val["val"]}'
 		results[key] = val
+
 	return results

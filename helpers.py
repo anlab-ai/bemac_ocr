@@ -35,7 +35,12 @@ def read_config_map(path):
 def convert_data_raw(path, results, config):
     str = ""
     for key in config.keys():
-        val = results[key]
+        if key in results.keys():
+            val = results[key]
+        else:
+            val = {}
+            val["val"] = "Nan"
+            val["score"]= ""
         str = f'{str}, {val["val"]}, {val["score"]}'
     return str
 
@@ -52,7 +57,7 @@ def write_title(path , config):
 def convert_time(t_detect ):
     
     h = t_detect//3600
-    t_detect = t_detect -h
+    t_detect = t_detect -h*3600
     p = t_detect//60
     s = t_detect%60
     if s<10:
@@ -67,4 +72,4 @@ def convert_time(t_detect ):
 # results = {1: {'val': '', 'score': 0}, 2: {'val': '146', 'score': 0.8917601108551025}, 3: {'val': '1', 'score': 0.9696356058120728}, 4: {'val': '', 'score': 0}, 5: {'val': '25', 'score': 0.9985036253929138}, 6: {'val': '31', 'score': 0.9988996386528015}, 7: {'val': '9', 'score': 0.8964625597000122}, 8: {'val': '0', 'score': 0.7356021404266357}, 9: {'val': '', 'score': 0}, 10: {'val': '0', 'score': 0.8144099116325378}, 11: {'val': '13', 'score': 0.9951754808425903}, 12: {'val': '140', 'score': 0.9952371716499329}, 13: {'val': '140', 'score': 0.9950234293937683}, 14: {'val': '6', 'score': 0.9555354118347168}, 15: {'val': '131', 'score': 0.9718061685562134}, 16: {'val': '0', 'score': 0.8079658150672913}, 17: {'val': '131', 'score': 0.9694032669067383}, 18: {'val': '0', 'score': 0.9853349328041077}, 19: {'val': '893', 'score': 0.9961639046669006}, 20: {'val': '902', 'score': 0.9291706681251526}, 21: {'val': '2', 'score': 0.9793241620063782}, 22: {'val': '0.00', 'score': 0.9329445362091064}, 23: {'val': '2.58', 'score': 0.9942781329154968}, 24: {'val': '1.19', 'score': 0.995485782623291}, 25: {'val': '0.36', 'score': 0.9943279027938843}}
 # # write_ouput_data("test.csv", results, map_config)
 # write_title("test.csv",  map_config)
-# print(convert_time(100))
+print(convert_time(5400))

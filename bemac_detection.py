@@ -208,6 +208,15 @@ class BemacOCR():
 		
 		return list_images_crop
 
+	def convert_char2digit(self, texts , scores, min_score = 0.5, min_1char= 0.3):
+		for i , text in enumerate(texts) :
+			s = float(scores[i])
+			
+			if s > min_score or (s > min_1char and len(text) == 1):
+				text = cppo_helpers.replace_char2digit(text)
+			texts[i] = text
+		return texts
+
 
 	def OCR_Reader(self,images_rotate, frame_number):
 		"""
@@ -251,7 +260,9 @@ class BemacOCR():
 				#boxes = [line[0] for line in result]
 				scores = [line[-1][1] for line in result]
 				txts = [(((line[-1][0].replace('O', '0')).replace(' ', '')).replace(' ', '')) for line in result]
-				print(txts)
+				print(txts, scores)
+				if self.type_divice == 3 :
+					txts = self.convert_char2digit(txts, scores)
 				for k in range(len(txts)):
 					txts[k] = ''.join(filter(lambda char: char.isdigit() or char == '.'  or char == '-' , txts[k]))
 
@@ -304,7 +315,7 @@ class BemacOCR():
 			t1 = time.time()
 
 			if not(res):
-				return results
+				return results, frame
 
 		
 			#Step 2: crop_item ocr
@@ -318,7 +329,7 @@ class BemacOCR():
 			# segment image.
 			res, img_device = cppo_helpers.segment_device(frame)
 			if not(res):
-				return results
+				return results, frame
 
 			#Step 2, 3.1: crop_item ocr .
 			results_image_rotate = cppo_helpers.crop_items(img_device, self.config_position)
@@ -351,23 +362,27 @@ class BemacOCR():
 		count = 0
 		while True:
 				ret, frame = cap.read()
+				# frame = cv2.imread("frame.jpg")
 				if not ret:
 					break
-				print("frame_number ", frame_number)
+				
 				if frame_number % fps == 0:
+					
 					start = time.time()
 
 					results, frame = self.process(frame=frame, frame_number= frame_number)
 					# cv2.imwrite("frame.jpg", frame)
-					# print("results ", results)
+					print("results ", results)
 					# exit()
 					str_data = helpers.convert_data_raw(path_out ,results, self.config_position )
 					time_detect= helpers.convert_time(count)
+					print("timestamp: ", time_detect)
 					str_data = f'{count}, {time_detect} {str_data}'
 					# print("str_data" , str_data)
 					count += 1 
 					with open(path_out, 'a') as file:
 						file.write(str_data + "\n")
+					# exit(1)
 				frame_number += 1
 				# if count > 3:
 				# 	exit()
